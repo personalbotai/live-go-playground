@@ -4,42 +4,443 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Go Playground</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
-        h1 { font-size: 3rem; margin-bottom: 1rem; }
-        p { font-size: 1.2rem; opacity: 0.9; }
-        .status {
-            display: inline-block;
-            margin-top: 1rem;
-            padding: 0.5rem 1.5rem;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50px;
-            font-size: 0.9rem;
-        }
+        .editor { font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; tab-size: 4; }
+        .output { font-family: 'Monaco', 'Menlo', monospace; white-space: pre-wrap; }
+        .run-btn { transition: all 0.2s; }
+        .run-btn:active { transform: scale(0.95); }
+        .skeleton { background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%); background-size: 200% 100%; animation: skeleton 1.5s infinite; }
+        @keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>💻 Live Go Playground</h1>
-        <p>Interactive Go code editor and runtime with real-time execution</p>
-        <div class="status">🚧 Under Construction</div>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <nav class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-code text-cyan-400 text-xl mr-2"></i>
+                    <span class="text-xl font-bold text-cyan-400">Live Go Playground</span>
+                    <span class="ml-2 px-2 py-0.5 bg-blue-900 text-blue-300 text-xs rounded">v1.0</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="shareCode()" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-share-alt mr-1"></i> Share
+                    </button>
+                    <button onclick="resetCode()" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-undo mr-1"></i> Reset
+                    </button>
+                    <button onclick="openExamples()" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                        <i class="fas fa-book mr-1"></i> Examples
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Examples Modal -->
+    <div id="examples-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center">
+                <h2 class="text-xl font-bold text-white">Example Programs</h2>
+                <button onclick="closeExamples()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="example-card bg-gray-700 p-4 rounded cursor-pointer hover:bg-gray-600" onclick="loadExample('hello')">
+                    <h3 class="font-semibold text-white mb-2">Hello World</h3>
+                    <pre class="text-xs text-gray-300 bg-gray-900 p-2 rounded overflow-x-auto">package main
+import "fmt"
+func main() {
+    fmt.Println("Hello, World!")
+}</pre>
+                </div>
+                <div class="example-card bg-gray-700 p-4 rounded cursor-pointer hover:bg-gray-600" onclick="loadExample('fibonacci')">
+                    <h3 class="font-semibold text-white mb-2">Fibonacci</h3>
+                    <pre class="text-xs text-gray-300 bg-gray-900 p-2 rounded overflow-x-auto">package main
+import "fmt"
+func fibonacci(n int) int {
+    if n <= 1 { return n }
+    return fibonacci(n-1) + fibonacci(n-2)
+}
+func main() {
+    for i := 0; i < 10; i++ {
+        fmt.Printf("F%d=%d\n", i, fibonacci(i))
+    }
+}</pre>
+                </div>
+                <div class="example-card bg-gray-700 p-4 rounded cursor-pointer hover:bg-gray-600" onclick="loadExample('struct')">
+                    <h3 class="font-semibold text-white mb-2">Struct & Methods</h3>
+                    <pre class="text-xs text-gray-300 bg-gray-900 p-2 rounded overflow-x-auto">package main
+import "fmt"
+type Person struct {
+    Name string
+    Age  int
+}
+func (p Person) Greet() string {
+    return "Hello, I'm " + p.Name
+}
+func main() {
+    p := Person{Name: "Alice", Age: 30}
+    fmt.Println(p.Greet())
+    fmt.Printf("Age: %d\n", p.Age)
+}</pre>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Editor & Output -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Code Editor -->
+            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="font-semibold text-white"><i class="fas fa-edit mr-2"></i>Code Editor</h2>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="formatCode()" class="text-gray-400 hover:text-white text-sm" title="Format">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                        <button onclick="clearEditor()" class="text-gray-400 hover:text-white text-sm" title="Clear">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-1 p-4">
+                    <textarea id="code-editor" class="w-full h-full bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500 editor" placeholder="package main
+
+import \"fmt\"
+
+func main() {
+    fmt.Println(\"Hello, Go!\")
+}"></textarea>
+                </div>
+                <div class="p-4 border-t border-gray-700 flex justify-between items-center">
+                    <span class="text-xs text-gray-400"><i class="fas fa-keyboard mr-1"></i> Ctrl+Enter to run</span>
+                    <span id="char-count" class="text-xs text-gray-400">0 chars</span>
+                </div>
+            </div>
+
+            <!-- Output -->
+            <div class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="font-semibold text-white"><i class="fas fa-terminal mr-2"></i>Output</h2>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="copyOutput()" class="text-gray-400 hover:text-white text-sm" title="Copy">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button onclick="clearOutput()" class="text-gray-400 hover:text-white text-sm" title="Clear">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-1 p-4 bg-gray-900 overflow-auto">
+                    <div id="output" class="output text-gray-300 min-h-full">
+                        <span class="text-gray-500 italic">// Output will appear here...</span>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-700 flex justify-between items-center">
+                    <span id="status" class="text-sm text-gray-400">Ready</span>
+                    <span id="exec-time" class="text-sm text-gray-400 hidden"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Run Button & Options -->
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <button onclick="runCode()" id="run-btn" class="run-btn bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg flex items-center justify-center text-lg">
+                        <i class="fas fa-play mr-2"></i> Run Code
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="include-tests" class="w-4 h-4">
+                        <label for="include-tests" class="text-sm text-gray-300">Include tests</label>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4 text-sm text-gray-400">
+                    <span><i class="fas fa-info-circle mr-1"></i> Powered by play.golang.org</span>
+                    <span id="version">Go 1.21</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Share Panel (hidden) -->
+        <div id="share-panel" class="fixed bottom-4 right-4 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-4 hidden z-50 w-96">
+            <h3 class="font-semibold text-white mb-2">Share Code</h3>
+            <input type="text" id="share-url" readonly class="w-full bg-gray-700 text-gray-200 px-3 py-2 rounded text-sm mb-2">
+            <button onclick="copyShareUrl()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm">
+                <i class="fas fa-copy mr-1"></i> Copy URL
+            </button>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = 'https://play.golang.org';
+        const editor = document.getElementById('code-editor');
+        const output = document.getElementById('output');
+        const runBtn = document.getElementById('run-btn');
+        const status = document.getElementById('status');
+        const execTime = document.getElementById('exec-time');
+
+        // Examples
+        const examples = {
+            hello: `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+}`,
+            fibonacci: `package main
+
+import "fmt"
+
+func fibonacci(n int) int {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n-1) + fibonacci(n-2)
+}
+
+func main() {
+    for i := 0; i < 10; i++ {
+        fmt.Printf("F%d = %d\n", i, fibonacci(i))
+    }
+}`,
+            struct: `package main
+
+import "fmt"
+
+type Person struct {
+    Name string
+    Age  int
+}
+
+func (p Person) Greet() string {
+    return "Hello, I'm " + p.Name
+}
+
+func main() {
+    p := Person{Name: "Alice", Age: 30}
+    fmt.Println(p.Greet())
+    fmt.Printf("Age: %d\n", p.Age)
+}`
+        };
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('go-playground-code');
+            if (saved) {
+                editor.value = saved;
+            } else {
+                editor.value = examples.hello;
+            }
+            editor.focus();
+            updateCharCount();
+            
+            // Load from URL if shared
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            if (code) {
+                try {
+                    editor.value = decodeURIComponent(atob(code));
+                } catch (e) {}
+            }
+        });
+
+        // Auto-save
+        editor.addEventListener('input', () => {
+            localStorage.setItem('go-playground-code', editor.value);
+            updateCharCount();
+        });
+
+        // Keyboard shortcut
+        editor.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                runCode();
+            }
+        });
+
+        function updateCharCount() {
+            document.getElementById('char-count').textContent = editor.value.length + ' chars';
+        }
+
+        async function runCode() {
+            const code = editor.value.trim();
+            if (!code) {
+                output.innerHTML = '<span class="text-yellow-400">Please enter some code</span>';
+                return;
+            }
+
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running...';
+            status.textContent = 'Compiling...';
+            output.innerHTML = '<span class="text-gray-500">Compiling...</span>';
+
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch(API_BASE + '/compile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        version: 2,
+                        body: code,
+                        withTests: document.getElementById('include-tests').checked
+                    })
+                });
+
+                const result = await response.json();
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+
+                if (result.Errors) {
+                    output.innerHTML = `<div class="text-red-400"><i class="fas fa-times-circle mr-2"></i>Compilation Failed\n\n${result.Errors}</div>`;
+                    status.textContent = 'Failed';
+                } else if (result.Output) {
+                    const events = parseEvents(result.Output);
+                    output.innerHTML = events.map(e => {
+                        if (e.kind === 'stdout' || e.kind === 'stderr') {
+                            return `<div class="${e.kind === 'stderr' ? 'text-red-400' : 'text-gray-300'}">${escapeHtml(e.data)}</div>`;
+                        }
+                        return '';
+                    }).join('');
+                    status.textContent = 'Success';
+                    execTime.textContent = duration + 'ms';
+                    execTime.classList.remove('hidden');
+                } else {
+                    output.innerHTML = '<span class="text-green-400"><i class="fas fa-check-circle mr-2"></i>Program executed successfully (no output)</span>';
+                    status.textContent = 'Success';
+                }
+
+            } catch (error) {
+                output.innerHTML = `<div class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Error: ${error.message}</div>`;
+                status.textContent = 'Error';
+            } finally {
+                runBtn.disabled = false;
+                runBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Run Code';
+            }
+        }
+
+        function parseEvents(output) {
+            // The Go Playground returns events in a specific format
+            // Each event is a line like: "event: stdout" or "data: Hello\n"
+            const lines = output.split('\n');
+            const events = [];
+            let currentEvent = null;
+
+            for (let line of lines) {
+                if (line.startsWith('event:')) {
+                    if (currentEvent) events.push(currentEvent);
+                    currentEvent = { kind: line.slice(6).trim(), data: '' };
+                } else if (line.startsWith('data:') && currentEvent) {
+                    currentEvent.data += line.slice(5) + '\n';
+                }
+            }
+            if (currentEvent) events.push(currentEvent);
+            return events;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;')
+                       .replace(/"/g, '&quot;')
+                       .replace(/'/g, '&#039;');
+        }
+
+        function formatCode() {
+            // Basic formatting: just normalize whitespace for now
+            const code = editor.value;
+            const formatted = code.replace(/\r\n/g, '\n').replace(/\t/g, '    ');
+            editor.value = formatted;
+        }
+
+        function clearEditor() {
+            if (confirm('Clear code editor?')) {
+                editor.value = '';
+                output.innerHTML = '<span class="text-gray-500 italic">// Output will appear here...</span>';
+                status.textContent = 'Ready';
+                execTime.classList.add('hidden');
+            }
+        }
+
+        function resetCode() {
+            if (confirm('Reset to default example?')) {
+                editor.value = examples.hello;
+                output.innerHTML = '<span class="text-gray-500 italic">// Output will appear here...</span>';
+                status.textContent = 'Ready';
+                execTime.classList.add('hidden');
+                showToast('Code reset to Hello World example');
+            }
+        }
+
+        function clearOutput() {
+            output.innerHTML = '<span class="text-gray-500 italic">// Output will appear here...</span>';
+            status.textContent = 'Ready';
+            execTime.classList.add('hidden');
+        }
+
+        function copyOutput() {
+            const text = output.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Output copied to clipboard!');
+            });
+        }
+
+        function openExamples() {
+            document.getElementById('examples-modal').classList.remove('hidden');
+        }
+
+        function closeExamples() {
+            document.getElementById('examples-modal').classList.add('hidden');
+        }
+
+        function loadExample(key) {
+            editor.value = examples[key];
+            closeExamples();
+            showToast('Example loaded!');
+        }
+
+        function shareCode() {
+            const code = editor.value;
+            const encoded = btoa(unescape(encodeURIComponent(code)));
+            const url = window.location.origin + window.location.pathname + '?code=' + encoded;
+            document.getElementById('share-url').value = url;
+            document.getElementById('share-panel').classList.remove('hidden');
+        }
+
+        function copyShareUrl() {
+            const input = document.getElementById('share-url');
+            input.select();
+            document.execCommand('copy');
+            showToast('URL copied to clipboard!');
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 px-4 py-2 rounded-lg text-white bg-green-600 z-50';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Close modals on outside click
+        document.getElementById('examples-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeExamples();
+        });
+        document.getElementById('share-panel').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.classList.add('hidden');
+            }
+        });
+    </script>
 </body>
 </html>
